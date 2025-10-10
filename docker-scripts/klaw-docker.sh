@@ -10,7 +10,6 @@ PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdou
 
 build () {
 	echo "Build Klaw project binaries"
-	mvn spotless:apply
 	mvn clean install
 
 	echo "Build klaw-core docker image"
