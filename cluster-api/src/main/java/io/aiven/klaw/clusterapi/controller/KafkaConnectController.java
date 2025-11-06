@@ -21,14 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/topics")
 @Slf4j
 public class KafkaConnectController {
 
   @Autowired KafkaConnectService kafkaConnectService;
 
   @RequestMapping(
-      value = "/getAllConnectors/{kafkaConnectHost}/{protocol}/{clusterIdentification}",
+      value = "/topics/getAllConnectors/{kafkaConnectHost}/{protocol}/{clusterIdentification}",
       method = RequestMethod.GET,
       produces = {MediaType.APPLICATION_JSON_VALUE})
   public ResponseEntity<ConnectorsStatus> getAllConnectors(
@@ -43,8 +42,23 @@ public class KafkaConnectController {
   }
 
   @RequestMapping(
+      value = "/v2/connectors",
+      method = RequestMethod.GET,
+      produces = {MediaType.APPLICATION_JSON_VALUE})
+  public ResponseEntity<ConnectorsStatus> getAllConnectorsV2(
+      @RequestParam("host") String kafkaConnectHost,
+      @Valid @RequestParam("protocol") KafkaSupportedProtocol protocol,
+      @RequestParam("cluster") String clusterIdentification,
+      @RequestParam("includeStatus") boolean includeStatus) {
+    return new ResponseEntity<>(
+        kafkaConnectService.getConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, includeStatus),
+        HttpStatus.OK);
+  }
+
+  @RequestMapping(
       value =
-          "/getConnectorDetails/{connectorName}/{kafkaConnectHost}/{protocol}/{clusterIdentification}",
+          "/topics/getConnectorDetails/{connectorName}/{kafkaConnectHost}/{protocol}/{clusterIdentification}",
       method = RequestMethod.GET,
       produces = {MediaType.APPLICATION_JSON_VALUE})
   public ResponseEntity<Map<String, Object>> getConnectorDetails(
@@ -58,7 +72,7 @@ public class KafkaConnectController {
         HttpStatus.OK);
   }
 
-  @PostMapping(value = "/postConnector")
+  @PostMapping(value = "/topics/postConnector")
   public ResponseEntity<ApiResponse> postConnector(
       @RequestBody @Valid ClusterConnectorRequest clusterConnectorRequest) {
     try {
@@ -71,28 +85,28 @@ public class KafkaConnectController {
     }
   }
 
-  @PostMapping(value = "/updateConnector")
+  @PostMapping(value = "/topics/updateConnector")
   public ResponseEntity<ApiResponse> updateConnector(
       @RequestBody @Valid ClusterConnectorRequest clusterConnectorRequest) {
     return new ResponseEntity<>(
         kafkaConnectService.updateConnector(clusterConnectorRequest), HttpStatus.OK);
   }
 
-  @PostMapping(value = "/deleteConnector")
+  @PostMapping(value = "/topics/deleteConnector")
   public ResponseEntity<ApiResponse> deleteConnector(
       @RequestBody @Valid ClusterConnectorRequest clusterConnectorRequest) {
     return new ResponseEntity<>(
         kafkaConnectService.deleteConnector(clusterConnectorRequest), HttpStatus.OK);
   }
 
-  @PostMapping(value = "/connector/restart")
+  @PostMapping(value = "/topics/connector/restart")
   public ResponseEntity<ApiResponse> restartConnector(
       @RequestBody @Valid ClusterConnectorRequest clusterConnectorRequest) {
     return new ResponseEntity<>(
         kafkaConnectService.restartConnector(clusterConnectorRequest), HttpStatus.OK);
   }
 
-  @PostMapping(value = "/connector/pause")
+  @PostMapping(value = "/topics/connector/pause")
   public ResponseEntity<ApiResponse> pauseConnector(
       @RequestBody @Valid ClusterConnectorRequest clusterConnectorRequest) {
     return new ResponseEntity<>(
@@ -100,7 +114,7 @@ public class KafkaConnectController {
   }
 
   @PostMapping(
-      value = "/connector/resume",
+      value = "/topics/connector/resume",
       produces = {MediaType.APPLICATION_JSON_VALUE})
   public ResponseEntity<ApiResponse> resumeConnector(
       @RequestBody @Valid ClusterConnectorRequest clusterConnectorRequest) {

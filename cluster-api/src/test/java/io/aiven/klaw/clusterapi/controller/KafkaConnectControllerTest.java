@@ -188,6 +188,44 @@ public class KafkaConnectControllerTest {
         .andExpect(content().string(containsString(ApiResultStatus.SUCCESS.value)));
   }
 
+  @Test
+  public void getAllConnectorsV2Test() throws Exception {
+    String getUrl = "/v2/connectors?host=localhost&protocol=SSL&cluster=CLID1&includeStatus=false";
+    ConnectorsStatus connectors = utilMethods.getConnectorsStatus();
+    when(kafkaConnectService.getConnectors(anyString(), any(), anyString(), anyBoolean()))
+        .thenReturn(connectors);
+
+    mvc.perform(get(getUrl))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.connectorStateList", hasSize(2)))
+        .andExpect(content().string(containsString("conn1")))
+        .andExpect(content().string(containsString("conn2")));
+  }
+
+  @Test
+  public void getAllConnectorsV2WithStatusTest() throws Exception {
+    String getUrl = "/v2/connectors?host=localhost&protocol=PLAINTEXT&cluster=CLID1&includeStatus=true";
+    ConnectorsStatus connectors = utilMethods.getConnectorsStatus();
+    when(kafkaConnectService.getConnectors(anyString(), any(), anyString(), anyBoolean()))
+        .thenReturn(connectors);
+
+    mvc.perform(get(getUrl))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.connectorStateList", hasSize(2)));
+  }
+
+  @Test
+  public void getAllConnectorsV2InvalidProtocolTest() throws Exception {
+    String getUrl = "/v2/connectors?host=localhost&protocol=INVALIDPROTOCOL&cluster=CLID1&includeStatus=false";
+    ConnectorsStatus connectors = utilMethods.getConnectorsStatus();
+    when(kafkaConnectService.getConnectors(anyString(), any(), anyString(), anyBoolean()))
+        .thenReturn(connectors);
+
+    mvc.perform(get(getUrl)).andExpect(status().is4xxClientError());
+  }
+
   private static ClusterConnectorRequest getClusterConnectorRequest() {
     return ClusterConnectorRequest.builder()
         .clusterIdentification("CLID1")
