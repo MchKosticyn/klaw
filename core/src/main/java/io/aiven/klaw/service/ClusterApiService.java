@@ -1075,17 +1075,9 @@ public class ClusterApiService {
 
       log.info("Successfully retrieved connectors using v2 API");
       return responseEntity.getBody();
-    } catch (HttpClientErrorException e) {
-      // Fallback to v1 if v2 returns 404 or 405
-      if (e.getStatusCode() == HttpStatus.NOT_FOUND || e.getStatusCode() == HttpStatus.METHOD_NOT_ALLOWED) {
-        log.warn("v2 API not available ({}), falling back to v1 API", e.getStatusCode());
-        return getAllKafkaConnectorsV1(kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
-      }
-      log.error("Error from getAllKafkaConnectors v2", e);
-      throw new KlawException(CLUSTER_API_ERR_115);
     } catch (Exception e) {
-      log.error("Error from getAllKafkaConnectors v2, attempting v1 fallback", e);
-      // Try v1 as fallback for any other errors
+      // Fallback to v1 for any error
+      log.warn("v2 API failed ({}), falling back to v1 API", e.getMessage());
       try {
         return getAllKafkaConnectorsV1(kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
       } catch (Exception ex) {

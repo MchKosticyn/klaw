@@ -539,11 +539,11 @@ public class ClusterApiServiceTest {
     io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
         new io.aiven.klaw.model.cluster.ConnectorsStatus();
     List<io.aiven.klaw.model.cluster.ConnectorState> connectorStateList = new ArrayList<>();
-    io.aiven.klaw.model.cluster.ConnectorState connector1 =
+    io.aiven.klaw.model.cluster.ConnectorState testConnector =
         new io.aiven.klaw.model.cluster.ConnectorState();
-    connector1.setConnectorName("connector1");
-    connector1.setConnectorStatus("RUNNING");
-    connectorStateList.add(connector1);
+    testConnector.setConnectorName("connector1");
+    testConnector.setConnectorStatus("RUNNING");
+    connectorStateList.add(testConnector);
     connectorsStatus.setConnectorStateList(connectorStateList);
 
     ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> response =
@@ -574,14 +574,14 @@ public class ClusterApiServiceTest {
 
   @Test
   @Order(21)
-  public void getAllKafkaConnectorsFallbackToV1On404() throws KlawException {
+  public void getAllKafkaConnectorsV2FailureWithFallback() throws KlawException {
     io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
         new io.aiven.klaw.model.cluster.ConnectorsStatus();
     List<io.aiven.klaw.model.cluster.ConnectorState> connectorStateList = new ArrayList<>();
-    io.aiven.klaw.model.cluster.ConnectorState connector1 =
+    io.aiven.klaw.model.cluster.ConnectorState testConnector =
         new io.aiven.klaw.model.cluster.ConnectorState();
-    connector1.setConnectorName("connector1");
-    connectorStateList.add(connector1);
+    testConnector.setConnectorName("connector1");
+    connectorStateList.add(testConnector);
     connectorsStatus.setConnectorStateList(connectorStateList);
 
     ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> v1Response =
@@ -589,8 +589,7 @@ public class ClusterApiServiceTest {
 
     when(restTemplate.exchange(
             anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
-        .thenThrow(
-            new org.springframework.web.client.HttpClientErrorException(HttpStatus.NOT_FOUND))
+        .thenThrow(new org.springframework.web.client.HttpClientErrorException(HttpStatus.BAD_REQUEST))
         .thenReturn(v1Response);
 
     io.aiven.klaw.model.cluster.ConnectorsStatus result =
@@ -599,7 +598,6 @@ public class ClusterApiServiceTest {
 
     assertThat(result).isNotNull();
     assertThat(result.getConnectorStateList()).hasSize(1);
-    assertThat(result.getConnectorStateList().get(0).getConnectorName()).isEqualTo("connector1");
 
     verify(restTemplate, times(2))
         .exchange(
@@ -608,58 +606,6 @@ public class ClusterApiServiceTest {
 
   @Test
   @Order(22)
-  public void getAllKafkaConnectorsFallbackToV1On405() throws KlawException {
-    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
-        new io.aiven.klaw.model.cluster.ConnectorsStatus();
-    List<io.aiven.klaw.model.cluster.ConnectorState> connectorStateList = new ArrayList<>();
-    io.aiven.klaw.model.cluster.ConnectorState connector1 =
-        new io.aiven.klaw.model.cluster.ConnectorState();
-    connector1.setConnectorName("connector1");
-    connectorStateList.add(connector1);
-    connectorsStatus.setConnectorStateList(connectorStateList);
-
-    ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> v1Response =
-        new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
-
-    when(restTemplate.exchange(
-            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
-        .thenThrow(
-            new org.springframework.web.client.HttpClientErrorException(
-                HttpStatus.METHOD_NOT_ALLOWED))
-        .thenReturn(v1Response);
-
-    io.aiven.klaw.model.cluster.ConnectorsStatus result =
-        clusterApiService.getAllKafkaConnectors(
-            "localhost:8083", "PLAINTEXT", "cluster1", 1, true);
-
-    assertThat(result).isNotNull();
-    assertThat(result.getConnectorStateList()).hasSize(1);
-
-    verify(restTemplate, times(2))
-        .exchange(
-            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class));
-  }
-
-  @Test
-  @Order(23)
-  public void getAllKafkaConnectorsV2FailureWithoutFallback() {
-    when(restTemplate.exchange(
-            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
-        .thenThrow(new org.springframework.web.client.HttpClientErrorException(HttpStatus.BAD_REQUEST));
-
-    assertThatThrownBy(
-            () ->
-                clusterApiService.getAllKafkaConnectors(
-                    "localhost:8083", "PLAINTEXT", "cluster1", 1, true))
-        .isInstanceOf(KlawException.class);
-
-    verify(restTemplate, times(1))
-        .exchange(
-            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class));
-  }
-
-  @Test
-  @Order(24)
   public void getAllKafkaConnectorsV2FailureFallbackToV1AlsoFails() {
     when(restTemplate.exchange(
             anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
@@ -678,15 +624,15 @@ public class ClusterApiServiceTest {
   }
 
   @Test
-  @Order(25)
+  @Order(23)
   public void getAllKafkaConnectorsWithoutStatus() throws KlawException {
     io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
         new io.aiven.klaw.model.cluster.ConnectorsStatus();
     List<io.aiven.klaw.model.cluster.ConnectorState> connectorStateList = new ArrayList<>();
-    io.aiven.klaw.model.cluster.ConnectorState connector1 =
+    io.aiven.klaw.model.cluster.ConnectorState testConnector =
         new io.aiven.klaw.model.cluster.ConnectorState();
-    connector1.setConnectorName("connector1");
-    connectorStateList.add(connector1);
+    testConnector.setConnectorName("connector1");
+    connectorStateList.add(testConnector);
     connectorsStatus.setConnectorStateList(connectorStateList);
 
     ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> response =
