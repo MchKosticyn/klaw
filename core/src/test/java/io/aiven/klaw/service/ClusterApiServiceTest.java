@@ -520,6 +520,120 @@ public class ClusterApiServiceTest {
     assertThat(Objects.requireNonNull(response1)).isEqualTo(FAILED_TO_EXECUTE_SUCCESSFULLY);
   }
 
+  @Test
+  @Order(20)
+  public void getAllKafkaConnectorsV2Success() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    connectorsStatus.setConnectorStateList(new ArrayList<>());
+    ResponseEntity response = new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    when(restTemplate.exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any()))
+        .thenReturn(response);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", "SSL", "CLID1", 1, true);
+    assertThat(result).isNotNull();
+    assertThat(result.getConnectorStateList()).isEmpty();
+  }
+
+  @Test
+  @Order(21)
+  public void getAllKafkaConnectorsV2FallbackToV1() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    connectorsStatus.setConnectorStateList(new ArrayList<>());
+    ResponseEntity responseV1 = new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    // First call (v2) throws 404, second call (v1) succeeds
+    when(restTemplate.exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any()))
+        .thenThrow(new org.springframework.web.client.HttpClientErrorException(HttpStatus.NOT_FOUND))
+        .thenReturn(responseV1);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", "SSL", "CLID1", 1, true);
+    assertThat(result).isNotNull();
+    assertThat(result.getConnectorStateList()).isEmpty();
+    
+    // Verify that v2 was tried first, then v1
+    verify(restTemplate, times(2))
+        .exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any());
+  }
+
+  @Test
+  @Order(22)
+  public void getAllKafkaConnectorsV2FallbackToV1On405() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    connectorsStatus.setConnectorStateList(new ArrayList<>());
+    ResponseEntity responseV1 = new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    // First call (v2) throws 405, second call (v1) succeeds
+    when(restTemplate.exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any()))
+        .thenThrow(
+            new org.springframework.web.client.HttpClientErrorException(
+                HttpStatus.METHOD_NOT_ALLOWED))
+        .thenReturn(responseV1);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", "SSL", "CLID1", 1, true);
+    assertThat(result).isNotNull();
+    
+    // Verify that v2 was tried first, then v1
+    verify(restTemplate, times(2))
+        .exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any());
+  }
+
+  @Test
+  @Order(23)
+  public void getAllKafkaConnectorsV2FailureNoFallback() {
+    // v2 throws a non-404/405 error, should not fallback
+    when(restTemplate.exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any()))
+        .thenThrow(
+            new org.springframework.web.client.HttpClientErrorException(HttpStatus.BAD_REQUEST));
+
+    assertThatThrownBy(
+            () ->
+                clusterApiService.getAllKafkaConnectors(
+                    "localhost", "SSL", "CLID1", 1, true))
+        .isInstanceOf(KlawException.class);
+    
+    // Verify that only v2 was tried (no fallback)
+    verify(restTemplate, times(1))
+        .exchange(
+            Mockito.anyString(),
+            eq(HttpMethod.GET),
+            Mockito.any(),
+            (ParameterizedTypeReference<Object>) any());
+  }
+
   private Set<TopicConfig> getTopics() {
     Set<TopicConfig> topicsList = new HashSet<>();
     TopicConfig tc1 = new TopicConfig();
