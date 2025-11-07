@@ -27,6 +27,7 @@ public class KafkaConnectController {
 
   @Autowired KafkaConnectService kafkaConnectService;
 
+  // V1 API endpoint (legacy) with path parameters
   @RequestMapping(
       value = "/getAllConnectors/{kafkaConnectHost}/{protocol}/{clusterIdentification}",
       method = RequestMethod.GET,

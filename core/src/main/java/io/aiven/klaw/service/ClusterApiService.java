@@ -1053,31 +1053,86 @@ public class ClusterApiService {
       throws KlawException {
     log.info("getAllKafkaConnectors {}", kafkaConnectHost);
     getClusterApiProperties(tenantId);
+    
+    // Try v2 API first
     try {
-      String uriGetTopics =
-          URI_GET_ALL_CONNECTORS
-              + kafkaConnectHost
-              + "/"
-              + protocol
-              + "/"
-              + clusterIdentification
-              + URI_CONNECTOR_STATUS
-              + getConnectorsStatuses;
-      String uriGetConnectorsFull = clusterConnUrl + uriGetTopics;
-
-      ResponseEntity<ConnectorsStatus> responseEntity =
-          getRestTemplate(null)
-              .exchange(
-                  uriGetConnectorsFull,
-                  HttpMethod.GET,
-                  getHttpEntity(),
-                  new ParameterizedTypeReference<>() {});
-
-      return responseEntity.getBody();
+      return getAllKafkaConnectorsV2(
+          kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
+    } catch (HttpClientErrorException | HttpServerErrorException e) {
+      // Fallback to v1 if v2 returns 404, 405 or 501 (Not Implemented)
+      if (e.getStatusCode() == HttpStatus.NOT_FOUND
+          || e.getStatusCode() == HttpStatus.METHOD_NOT_ALLOWED
+          || e.getStatusCode() == HttpStatus.NOT_IMPLEMENTED) {
+        log.info(
+            "Cluster API v2 not available ({}), falling back to v1", e.getStatusCode());
+        return getAllKafkaConnectorsV1(
+            kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
+      }
+      log.error("Error from getAllKafkaConnectors v2", e);
+      throw new KlawException(CLUSTER_API_ERR_115);
     } catch (Exception e) {
       log.error("Error from getAllKafkaConnectors ", e);
       throw new KlawException(CLUSTER_API_ERR_115);
     }
+  }
+
+  private ConnectorsStatus getAllKafkaConnectorsV2(
+      String kafkaConnectHost,
+      String protocol,
+      String clusterIdentification,
+      boolean includeStatus)
+      throws KlawException {
+    log.debug("Attempting to use Cluster API v2 for connectors");
+    String uriGetConnectors =
+        URI_GET_ALL_CONNECTORS_V2
+            + "?host="
+            + kafkaConnectHost
+            + "&protocol="
+            + protocol
+            + "&cluster="
+            + clusterIdentification
+            + "&includeStatus="
+            + includeStatus;
+    String uriGetConnectorsFull = clusterConnUrl + uriGetConnectors;
+
+    ResponseEntity<ConnectorsStatus> responseEntity =
+        getRestTemplate(null)
+            .exchange(
+                uriGetConnectorsFull,
+                HttpMethod.GET,
+                getHttpEntity(),
+                new ParameterizedTypeReference<>() {});
+
+    return responseEntity.getBody();
+  }
+
+  private ConnectorsStatus getAllKafkaConnectorsV1(
+      String kafkaConnectHost,
+      String protocol,
+      String clusterIdentification,
+      boolean connectorStatus)
+      throws KlawException {
+    log.debug("Using Cluster API v1 for connectors");
+    String uriGetTopics =
+        URI_GET_ALL_CONNECTORS
+            + kafkaConnectHost
+            + "/"
+            + protocol
+            + "/"
+            + clusterIdentification
+            + URI_CONNECTOR_STATUS
+            + connectorStatus;
+    String uriGetConnectorsFull = clusterConnUrl + uriGetTopics;
+
+    ResponseEntity<ConnectorsStatus> responseEntity =
+        getRestTemplate(null)
+            .exchange(
+                uriGetConnectorsFull,
+                HttpMethod.GET,
+                getHttpEntity(),
+                new ParameterizedTypeReference<>() {});
+
+    return responseEntity.getBody();
   }
 
   public ApiResponse restartConnector(

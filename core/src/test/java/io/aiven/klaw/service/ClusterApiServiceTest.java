@@ -20,6 +20,7 @@ import io.aiven.klaw.error.KlawRestException;
 import io.aiven.klaw.helpers.db.rdbms.HandleDbRequestsJdbc;
 import io.aiven.klaw.model.ApiResponse;
 import io.aiven.klaw.model.cluster.ClusterSchemaRequest;
+import io.aiven.klaw.model.cluster.ConnectorsStatus;
 import io.aiven.klaw.model.cluster.LoadTopicsResponse;
 import io.aiven.klaw.model.enums.AclIPPrincipleType;
 import io.aiven.klaw.model.enums.ApiResultStatus;
@@ -54,6 +55,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 @Slf4j
@@ -531,5 +534,240 @@ public class ClusterApiServiceTest {
     topicsList.add(tc2);
 
     return topicsList;
+  }
+
+  @Test
+  @Order(18)
+  public void getAllKafkaConnectors_V2Success() throws KlawException {
+    // Given
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "PLAINTEXT";
+    String clusterIdentification = "cluster1";
+    boolean includeStatus = true;
+    int tenantId = 1;
+
+    ConnectorsStatus expectedStatus = new ConnectorsStatus();
+    ResponseEntity<ConnectorsStatus> responseEntity =
+        new ResponseEntity<>(expectedStatus, HttpStatus.OK);
+
+    when(restTemplate.exchange(
+            argThat(
+                (String uri) ->
+                    uri.contains("/v2/connectors")
+                        && uri.contains("host=" + kafkaConnectHost)
+                        && uri.contains("protocol=" + protocol)
+                        && uri.contains("cluster=" + clusterIdentification)
+                        && uri.contains("includeStatus=" + includeStatus)),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(responseEntity);
+
+    // When
+    ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    // Then
+    assertThat(result).isEqualTo(expectedStatus);
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(19)
+  public void getAllKafkaConnectors_V2NotFound_FallbackToV1() throws KlawException {
+    // Given
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "PLAINTEXT";
+    String clusterIdentification = "cluster1";
+    boolean includeStatus = true;
+    int tenantId = 1;
+
+    ConnectorsStatus expectedStatus = new ConnectorsStatus();
+    ResponseEntity<ConnectorsStatus> responseEntity =
+        new ResponseEntity<>(expectedStatus, HttpStatus.OK);
+
+    // V2 returns 404
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri != null && uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(new HttpClientErrorException(HttpStatus.NOT_FOUND));
+
+    // V1 succeeds
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri != null && uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(responseEntity);
+
+    // When
+    ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    // Then
+    assertThat(result).isEqualTo(expectedStatus);
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri != null && uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri != null && uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(20)
+  public void getAllKafkaConnectors_V2MethodNotAllowed_FallbackToV1() throws KlawException {
+    // Given
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "PLAINTEXT";
+    String clusterIdentification = "cluster1";
+    boolean includeStatus = true;
+    int tenantId = 1;
+
+    ConnectorsStatus expectedStatus = new ConnectorsStatus();
+    ResponseEntity<ConnectorsStatus> responseEntity =
+        new ResponseEntity<>(expectedStatus, HttpStatus.OK);
+
+    // V2 returns 405
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri != null && uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(new HttpClientErrorException(HttpStatus.METHOD_NOT_ALLOWED));
+
+    // V1 succeeds
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri != null && uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(responseEntity);
+
+    // When
+    ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    // Then
+    assertThat(result).isEqualTo(expectedStatus);
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri != null && uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri != null && uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(21)
+  public void getAllKafkaConnectors_V2NotImplemented_FallbackToV1() throws KlawException {
+    // Given
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "PLAINTEXT";
+    String clusterIdentification = "cluster1";
+    boolean includeStatus = true;
+    int tenantId = 1;
+
+    ConnectorsStatus expectedStatus = new ConnectorsStatus();
+    ResponseEntity<ConnectorsStatus> responseEntity =
+        new ResponseEntity<>(expectedStatus, HttpStatus.OK);
+
+    // V2 returns 501
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri != null && uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(new HttpServerErrorException(HttpStatus.NOT_IMPLEMENTED));
+
+    // V1 succeeds
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri != null && uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(responseEntity);
+
+    // When
+    ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    // Then
+    assertThat(result).isEqualTo(expectedStatus);
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri != null && uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri != null && uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(22)
+  public void getAllKafkaConnectors_V2OtherError_ThrowsException() {
+    // Given
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "PLAINTEXT";
+    String clusterIdentification = "cluster1";
+    boolean includeStatus = true;
+    int tenantId = 1;
+
+    // V2 returns 500 (should not fallback)
+    when(restTemplate.exchange(
+            argThat((String uri) -> uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR));
+
+    // When/Then
+    assertThatThrownBy(
+            () ->
+                clusterApiService.getAllKafkaConnectors(
+                    kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus))
+        .isInstanceOf(KlawException.class);
+
+    verify(restTemplate, times(1))
+        .exchange(
+            argThat((String uri) -> uri.contains("/v2/connectors")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
+    // V1 should not be called
+    verify(restTemplate, times(0))
+        .exchange(
+            argThat((String uri) -> uri.contains("/topics/getAllConnectors/")),
+            eq(HttpMethod.GET),
+            any(),
+            any(ParameterizedTypeReference.class));
   }
 }
