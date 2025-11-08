@@ -1059,9 +1059,10 @@ public class ClusterApiService {
       return getAllKafkaConnectorsV2(
           kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
     } catch (HttpClientErrorException e) {
-      // Fallback to v1 if v2 returns 404 or 405
+      // Fallback to v1 if v2 returns 404, 405 or 501
       if (e.getStatusCode() == HttpStatus.NOT_FOUND
-          || e.getStatusCode() == HttpStatus.METHOD_NOT_ALLOWED) {
+          || e.getStatusCode() == HttpStatus.METHOD_NOT_ALLOWED
+          || e.getStatusCode() == HttpStatus.NOT_IMPLEMENTED) {
         log.info(
             "v2 API not available ({}), falling back to v1 for getAllKafkaConnectors",
             e.getStatusCode());
@@ -1069,11 +1070,6 @@ public class ClusterApiService {
             kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
       }
       throw e;
-    } catch (Exception e) {
-      log.error("Error from getAllKafkaConnectors v2, trying v1", e);
-      // Try v1 as fallback for any other exception
-      return getAllKafkaConnectorsV1(
-          kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
     }
   }
 

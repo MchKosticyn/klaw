@@ -588,16 +588,16 @@ public class ClusterApiServiceTest {
 
   @Test
   @Order(23)
-  public void getAllKafkaConnectorsV2FallbackToV1OnOtherException() throws KlawException {
+  public void getAllKafkaConnectorsV2FallbackToV1On501() throws KlawException {
     io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
         new io.aiven.klaw.model.cluster.ConnectorsStatus();
     ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> successResponse =
         new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
 
-    // First call (v2) throws generic exception, second call (v1) succeeds
+    // First call (v2) throws 501 (Not Implemented), second call (v1) succeeds
     when(restTemplate.exchange(
             anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
-        .thenThrow(new RuntimeException("Connection timeout"))
+        .thenThrow(new HttpClientErrorException(HttpStatus.NOT_IMPLEMENTED))
         .thenReturn(successResponse);
 
     io.aiven.klaw.model.cluster.ConnectorsStatus result =
