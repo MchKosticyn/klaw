@@ -1092,15 +1092,8 @@ public class ClusterApiService {
       log.error("Error from getAllKafkaConnectors v2", e);
       throw new KlawException(CLUSTER_API_ERR_115);
     } catch (Exception e) {
-      log.error("Unexpected error from getAllKafkaConnectors v2, trying v1 fallback", e);
-      // Try v1 as fallback for any other unexpected errors
-      try {
-        return getAllKafkaConnectorsV1(
-            kafkaConnectHost, protocol, clusterIdentification, getConnectorsStatuses);
-      } catch (Exception fallbackException) {
-        log.error("Error from getAllKafkaConnectors v1 fallback", fallbackException);
-        throw new KlawException(CLUSTER_API_ERR_115);
-      }
+      log.error("Error from getAllKafkaConnectors v2", e);
+      throw new KlawException(CLUSTER_API_ERR_115);
     }
   }
 
