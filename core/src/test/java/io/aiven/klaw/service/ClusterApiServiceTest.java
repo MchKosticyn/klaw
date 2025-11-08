@@ -520,6 +520,230 @@ public class ClusterApiServiceTest {
     assertThat(Objects.requireNonNull(response1)).isEqualTo(FAILED_TO_EXECUTE_SUCCESSFULLY);
   }
 
+  @Test
+  @Order(30)
+  public void getAllKafkaConnectorsV2Success() throws Exception {
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "SSL";
+    String clusterIdentification = "CLID1";
+    int tenantId = 101;
+    boolean includeStatus = true;
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    connectorsStatus.setConnectorStateList(new ArrayList<>());
+
+    String expectedUrl =
+        "http://localhost:9343/v2/connectors?host="
+            + kafkaConnectHost
+            + "&protocol="
+            + protocol
+            + "&cluster="
+            + clusterIdentification
+            + "&includeStatus="
+            + includeStatus;
+
+    when(manageDatabase.getKwPropertyValue("klaw.clusterapi.url", tenantId))
+        .thenReturn("http://localhost:9343");
+    when(restTemplate.exchange(
+            eq(expectedUrl),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(new ResponseEntity<>(connectorsStatus, HttpStatus.OK));
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    assertThat(result).isNotNull();
+    verify(restTemplate, times(1))
+        .exchange(
+            eq(expectedUrl),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(31)
+  public void getAllKafkaConnectorsFallbackToV1On404() throws Exception {
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "SSL";
+    String clusterIdentification = "CLID1";
+    int tenantId = 101;
+    boolean includeStatus = true;
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    connectorsStatus.setConnectorStateList(new ArrayList<>());
+
+    String v2Url =
+        "http://localhost:9343/v2/connectors?host="
+            + kafkaConnectHost
+            + "&protocol="
+            + protocol
+            + "&cluster="
+            + clusterIdentification
+            + "&includeStatus="
+            + includeStatus;
+
+    String v1Url =
+        "http://localhost:9343/topics/getAllConnectors/"
+            + kafkaConnectHost
+            + "/"
+            + protocol
+            + "/"
+            + clusterIdentification
+            + "?connectorStatus="
+            + includeStatus;
+
+    when(manageDatabase.getKwPropertyValue("klaw.clusterapi.url", tenantId))
+        .thenReturn("http://localhost:9343");
+
+    // v2 returns 404
+    when(restTemplate.exchange(
+            eq(v2Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(new org.springframework.web.client.HttpClientErrorException(HttpStatus.NOT_FOUND));
+
+    // v1 succeeds
+    when(restTemplate.exchange(
+            eq(v1Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(new ResponseEntity<>(connectorsStatus, HttpStatus.OK));
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    assertThat(result).isNotNull();
+    // Verify v2 was tried first
+    verify(restTemplate, times(1))
+        .exchange(
+            eq(v2Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class));
+    // Verify v1 was called as fallback
+    verify(restTemplate, times(1))
+        .exchange(
+            eq(v1Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(32)
+  public void getAllKafkaConnectorsFallbackToV1On405() throws Exception {
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "SSL";
+    String clusterIdentification = "CLID1";
+    int tenantId = 101;
+    boolean includeStatus = false;
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    connectorsStatus.setConnectorStateList(new ArrayList<>());
+
+    String v2Url =
+        "http://localhost:9343/v2/connectors?host="
+            + kafkaConnectHost
+            + "&protocol="
+            + protocol
+            + "&cluster="
+            + clusterIdentification
+            + "&includeStatus="
+            + includeStatus;
+
+    String v1Url =
+        "http://localhost:9343/topics/getAllConnectors/"
+            + kafkaConnectHost
+            + "/"
+            + protocol
+            + "/"
+            + clusterIdentification
+            + "?connectorStatus="
+            + includeStatus;
+
+    when(manageDatabase.getKwPropertyValue("klaw.clusterapi.url", tenantId))
+        .thenReturn("http://localhost:9343");
+
+    // v2 returns 405 Method Not Allowed
+    when(restTemplate.exchange(
+            eq(v2Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(
+            new org.springframework.web.client.HttpClientErrorException(
+                HttpStatus.METHOD_NOT_ALLOWED));
+
+    // v1 succeeds
+    when(restTemplate.exchange(
+            eq(v1Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class)))
+        .thenReturn(new ResponseEntity<>(connectorsStatus, HttpStatus.OK));
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus);
+
+    assertThat(result).isNotNull();
+    verify(restTemplate, times(2))
+        .exchange(
+            anyString(),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(33)
+  public void getAllKafkaConnectorsV2FailsWithNonFallbackError() {
+    String kafkaConnectHost = "localhost:8083";
+    String protocol = "SSL";
+    String clusterIdentification = "CLID1";
+    int tenantId = 101;
+    boolean includeStatus = true;
+
+    String v2Url =
+        "http://localhost:9343/v2/connectors?host="
+            + kafkaConnectHost
+            + "&protocol="
+            + protocol
+            + "&cluster="
+            + clusterIdentification
+            + "&includeStatus="
+            + includeStatus;
+
+    when(manageDatabase.getKwPropertyValue("klaw.clusterapi.url", tenantId))
+        .thenReturn("http://localhost:9343");
+
+    // v2 returns 500 Internal Server Error (should not fallback)
+    when(restTemplate.exchange(
+            eq(v2Url),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            any(ParameterizedTypeReference.class)))
+        .thenThrow(
+            new org.springframework.web.client.HttpServerErrorException(
+                HttpStatus.INTERNAL_SERVER_ERROR));
+
+    assertThatThrownBy(
+            () ->
+                clusterApiService.getAllKafkaConnectors(
+                    kafkaConnectHost, protocol, clusterIdentification, tenantId, includeStatus))
+        .isInstanceOf(KlawException.class);
+  }
+
   private Set<TopicConfig> getTopics() {
     Set<TopicConfig> topicsList = new HashSet<>();
     TopicConfig tc1 = new TopicConfig();

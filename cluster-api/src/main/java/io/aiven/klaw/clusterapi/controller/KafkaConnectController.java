@@ -27,6 +27,7 @@ public class KafkaConnectController {
 
   @Autowired KafkaConnectService kafkaConnectService;
 
+  // v1 API - legacy endpoint for backward compatibility
   @RequestMapping(
       value = "/getAllConnectors/{kafkaConnectHost}/{protocol}/{clusterIdentification}",
       method = RequestMethod.GET,
@@ -39,6 +40,22 @@ public class KafkaConnectController {
     return new ResponseEntity<>(
         kafkaConnectService.getConnectors(
             kafkaConnectHost, protocol, clusterIdentification, connectorStatus),
+        HttpStatus.OK);
+  }
+
+  // v2 API - new endpoint with query parameters
+  @RequestMapping(
+      value = "/v2/connectors",
+      method = RequestMethod.GET,
+      produces = {MediaType.APPLICATION_JSON_VALUE})
+  public ResponseEntity<ConnectorsStatus> getAllConnectorsV2(
+      @RequestParam("host") String kafkaConnectHost,
+      @Valid @RequestParam("protocol") KafkaSupportedProtocol protocol,
+      @RequestParam("cluster") String clusterIdentification,
+      @RequestParam("includeStatus") boolean includeStatus) {
+    return new ResponseEntity<>(
+        kafkaConnectService.getConnectors(
+            kafkaConnectHost, protocol, clusterIdentification, includeStatus),
         HttpStatus.OK);
   }
 

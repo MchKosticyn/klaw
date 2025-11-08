@@ -134,6 +134,48 @@ public class KafkaConnectControllerTest {
   }
 
   @Test
+  public void getAllConnectorsV2Test() throws Exception {
+    String getUrl =
+        "/topics/v2/connectors?host=localhost&protocol="
+            + KafkaSupportedProtocol.SSL
+            + "&cluster=CLID1&includeStatus=true";
+    ConnectorsStatus connectors = utilMethods.getConnectorsStatus();
+    when(kafkaConnectService.getConnectors(anyString(), any(), anyString(), anyBoolean()))
+        .thenReturn(connectors);
+
+    mvc.perform(get(getUrl))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.connectorStateList", hasSize(2)))
+        .andExpect(content().string(containsString("conn1")))
+        .andExpect(content().string(containsString("conn2")));
+  }
+
+  @Test
+  public void getAllConnectorsV2WithoutStatusTest() throws Exception {
+    String getUrl =
+        "/topics/v2/connectors?host=localhost&protocol="
+            + KafkaSupportedProtocol.PLAINTEXT
+            + "&cluster=CLID2&includeStatus=false";
+    ConnectorsStatus connectors = utilMethods.getConnectorsStatus();
+    when(kafkaConnectService.getConnectors(anyString(), any(), anyString(), anyBoolean()))
+        .thenReturn(connectors);
+
+    mvc.perform(get(getUrl))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.connectorStateList", hasSize(2)));
+  }
+
+  @Test
+  public void getAllConnectorsV2InvalidProtocolTest() throws Exception {
+    String getUrl =
+        "/topics/v2/connectors?host=localhost&protocol=INVALIDPROTOCOL&cluster=CLID1&includeStatus=true";
+
+    mvc.perform(get(getUrl)).andExpect(status().is4xxClientError());
+  }
+
+  @Test
   public void postConnectorTest() throws Exception {
     String postUrl = "/topics/postConnector";
     ApiResponse apiResponse = ApiResponse.builder().message(ApiResultStatus.SUCCESS.value).build();
