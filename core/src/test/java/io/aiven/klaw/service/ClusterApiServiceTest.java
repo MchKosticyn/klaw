@@ -54,6 +54,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 @Slf4j
@@ -518,6 +519,94 @@ public class ClusterApiServiceTest {
             "2",
             101);
     assertThat(Objects.requireNonNull(response1)).isEqualTo(FAILED_TO_EXECUTE_SUCCESSFULLY);
+  }
+
+  @Test
+  @Order(20)
+  public void getAllKafkaConnectorsV2Success() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> response =
+        new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    when(restTemplate.exchange(
+            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
+        .thenReturn(response);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", KafkaSupportedProtocol.PLAINTEXT.getValue(), "CLID1", 1, true);
+
+    assertThat(result).isNotNull();
+  }
+
+  @Test
+  @Order(21)
+  public void getAllKafkaConnectorsV2FallbackToV1On404() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> successResponse =
+        new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    // First call (v2) throws 404, second call (v1) succeeds
+    when(restTemplate.exchange(
+            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
+        .thenThrow(new HttpClientErrorException(HttpStatus.NOT_FOUND))
+        .thenReturn(successResponse);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", KafkaSupportedProtocol.PLAINTEXT.getValue(), "CLID1", 1, true);
+
+    assertThat(result).isNotNull();
+    verify(restTemplate, times(2))
+        .exchange(anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(22)
+  public void getAllKafkaConnectorsV2FallbackToV1On405() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> successResponse =
+        new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    // First call (v2) throws 405, second call (v1) succeeds
+    when(restTemplate.exchange(
+            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
+        .thenThrow(new HttpClientErrorException(HttpStatus.METHOD_NOT_ALLOWED))
+        .thenReturn(successResponse);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", KafkaSupportedProtocol.PLAINTEXT.getValue(), "CLID1", 1, false);
+
+    assertThat(result).isNotNull();
+    verify(restTemplate, times(2))
+        .exchange(anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class));
+  }
+
+  @Test
+  @Order(23)
+  public void getAllKafkaConnectorsV2FallbackToV1OnOtherException() throws KlawException {
+    io.aiven.klaw.model.cluster.ConnectorsStatus connectorsStatus =
+        new io.aiven.klaw.model.cluster.ConnectorsStatus();
+    ResponseEntity<io.aiven.klaw.model.cluster.ConnectorsStatus> successResponse =
+        new ResponseEntity<>(connectorsStatus, HttpStatus.OK);
+
+    // First call (v2) throws generic exception, second call (v1) succeeds
+    when(restTemplate.exchange(
+            anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class)))
+        .thenThrow(new RuntimeException("Connection timeout"))
+        .thenReturn(successResponse);
+
+    io.aiven.klaw.model.cluster.ConnectorsStatus result =
+        clusterApiService.getAllKafkaConnectors(
+            "localhost", KafkaSupportedProtocol.PLAINTEXT.getValue(), "CLID1", 1, true);
+
+    assertThat(result).isNotNull();
+    verify(restTemplate, times(2))
+        .exchange(anyString(), eq(HttpMethod.GET), any(), any(ParameterizedTypeReference.class));
   }
 
   private Set<TopicConfig> getTopics() {
